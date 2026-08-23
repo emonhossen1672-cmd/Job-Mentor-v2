@@ -1,0 +1,318 @@
+const LABELS = ["ক", "খ", "গ", "ঘ"];
+
+let currentExam = null;      // exam সহ প্রশ্ন (options সহ, correctIndex ছাড়া)
+let flatQuestions = [];
+let currentIndex = 0;
+let answers = {};            // { questionId: selectedIndex }
+let marked = {};             // { questionId: true }
+let secondsLeft = 0;
+let timerHandle = null;
+let studentName = "";
+let lastExamId = null;
+
+function show(viewId) {
+  document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+  document.getElementById(viewId).classList.remove("hidden");
+}
+
+// ---------------- HOME ----------------
+async function loadExamList() {
+  const res = await fetch("/api/exams");
+  const exams = await res.json();
+  const wrap = document.getElementById("exam-list");
+  wrap.innerHTML = "";
+  exams.forEach((e) => {
+    const btn = document.createElement("button");
+    btn.className = "tile b1";
+    btn.innerHTML = `
+      <div class="badge">📝</div>
+      <div class="t-title">${e.title}</div>
+      <div class="t-sub">${e.totalQuestions}টি প্রশ্ন · ${e.durationMinutes} মিনিট</div>
+    `;
+    btn.onclick = () => promptName(e.id);
+    wrap.appendChild(btn);
+  });
+}
+
+function promptName(examId) {
+  lastExamId = examId;
+  document.getElementById("name-input").value = studentName;
+  show("view-name");
+}
+
+document.getElementById("btn-cancel-name").onclick = () => show("view-home");
+document.getElementById("btn-refresh").onclick = loadExamList;
+document.getElementById("btn-merit").onclick = () => {
+  if (!lastExamId) { alert("আগে একটা পরীক্ষা দিন, তারপর মেরিট লিস্ট দেখা যাবে।"); return; }
+  loadMerit(lastExamId);
+};
+
+// ---------------- START EXAM ----------------
+document.getElementById("btn-start-exam").onclick = async () => {
+  const name = document.getElementById("name-input").value.trim();
+  if (!name) { alert("নাম লিখুন"); return; }
+  studentName = name;
+
+  const res = await fetch(`/api/exams/${lastExamId}`);
+  currentExam = await res.json();
+  flatQuestions = currentExam.sections.flatMap((s) =>
+    s.questions.map((q) => ({ ...q, section: s.name }))
+  );
+  currentIndex = 0;
+  answers = {};
+  marked = {};
+  secondsLeft = currentExam.durationMinutes * 60;
+
+  document.getElementById("exam-title").textContent = currentExam.title;
+  renderQuestion();
+  renderPanel();
+  startTimer();
+  show("view-exam");
+};
+
+function startTimer() {
+  clearInterval(timerHandle);
+  updateTimerDisplay();
+  timerHandle = setInterval(() => {
+    secondsLeft--;
+    updateTimerDisplay();
+    if (secondsLeft <= 0) {
+      clearInterval(timerHandle);
+      submitExam();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const s = String(secondsLeft % 60).padStart(2, "0");
+  const el = document.getElementById("timer");
+  el.textContent = `${m}:${s}`;
+  el.classList.toggle("critical", secondsLeft <= 60);
+}
+
+// ---------------- QUESTION VIEW ----------------
+function renderQuestion() {
+  const q = flatQuestions[currentIndex];
+  document.getElementById("q-section").textContent = q.section;
+  document.getElementById("q-text").textContent = q.text;
+  document.getElementById("progress-text").textContent = `প্রশ্ন ${currentIndex + 1}/${flatQuestions.length}`;
+  document.getElementById("answered-text").textContent = `উত্তর দেওয়া হয়েছে ${Object.keys(answers).length}/${flatQuestions.length}`;
+  document.getElementById("progress-fill").style.width = `${(Object.keys(answers).length / flatQuestions.length) * 100}%`;
+
+  const optWrap = document.getElementById("q-options");
+  optWrap.innerHTML = "";
+  q.options.forEach((opt, idx) => {
+    const b = document.createElement("button");
+    b.className = "opt-btn" + (answers[q.id] === idx ? " selected" : "");
+    b.innerHTML = `<span class="opt-label">${LABELS[idx]}</span><span class="opt-text">${opt}</span>`;
+    b.onclick = () => { answers[q.id] = idx; renderQuestion(); renderPanel(); };
+    optWrap.appendChild(b);
+  });
+
+  const markBtn = document.getElementById("btn-mark");
+  markBtn.classList.toggle("active", !!marked[q.id]);
+  markBtn.textContent = marked[q.id] ? "🚩 রিভিউর জন্য চিহ্নিত" : "🚩 পরে রিভিউ করার জন্য চিহ্নিত করুন";
+
+  document.getElementById("btn-prev").disabled = currentIndex === 0;
+  const isLast = currentIndex === flatQuestions.length - 1;
+  document.getElementById("btn-next").classList.toggle("hidden", isLast);
+  document.getElementById("btn-submit").classList.toggle("hidden", !isLast);
+}
+
+function renderPanel() {
+  const panel = document.getElementById("q-panel");
+  panel.innerHTML = "";
+  flatQuestions.forEach((q, idx) => {
+    const b = document.createElement("button");
+    let cls = "q-btn";
+    if (marked[q.id]) cls += " marked";
+    else if (answers[q.id] !== undefined) cls += " answered";
+    if (idx === currentIndex) cls += " current";
+    b.className = cls;
+    b.textContent = idx + 1;
+    b.onclick = () => { currentIndex = idx; renderQuestion(); renderPanel(); };
+    panel.appendChild(b);
+  });
+}
+
+document.getElementById("btn-mark").onclick = () => {
+  const q = flatQuestions[currentIndex];
+  marked[q.id] = !marked[q.id];
+  renderQuestion(); renderPanel();
+};
+document.getElementById("btn-prev").onclick = () => { currentIndex = Math.max(0, currentIndex - 1); renderQuestion(); renderPanel(); };
+document.getElementById("btn-next").onclick = () => { currentIndex = Math.min(flatQuestions.length - 1, currentIndex + 1); renderQuestion(); renderPanel(); };
+document.getElementById("btn-submit").onclick = () => {
+  const remaining = flatQuestions.length - Object.keys(answers).length;
+  if (remaining > 0 && !confirm(`এখনও ${remaining}টি প্রশ্ন বাকি আছে। তবুও জমা দিতে চান?`)) return;
+  submitExam();
+};
+
+async function submitExam() {
+  clearInterval(timerHandle);
+  const res = await fetch(`/api/exams/${currentExam.id}/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: studentName, answers }),
+  });
+  const data = await res.json();
+  renderResult(data);
+  show("view-result");
+}
+
+// ---------------- RESULT (ভুল মার্কিং) ----------------
+function renderResult(data) {
+  const { submission, questions } = data;
+  document.getElementById("result-summary").innerHTML = `
+    <div><div class="num">${submission.score}</div><div class="lbl">স্কোর</div></div>
+    <div><div class="num">${submission.correct}</div><div class="lbl">সঠিক</div></div>
+    <div><div class="num">${submission.wrong}</div><div class="lbl">ভুল</div></div>
+    <div><div class="num">${submission.unanswered}</div><div class="lbl">বাদ</div></div>
+  `;
+
+  const list = document.getElementById("result-list");
+  list.innerHTML = "";
+  questions.forEach((q, i) => {
+    const state = q.selectedIndex === null ? "skipped" : q.isCorrect ? "correct" : "wrong";
+    const tagText = state === "correct" ? "সঠিক" : state === "wrong" ? "ভুল" : "উত্তর দেওয়া হয়নি";
+    const div = document.createElement("div");
+    div.className = `result-item ${state}`;
+    div.innerHTML = `
+      <span class="tag">${i + 1}. ${tagText}</span>
+      <p class="q">${q.text}</p>
+      <p class="ans-line">সঠিক উত্তর: <b>${LABELS[q.correctIndex]}. ${q.options[q.correctIndex]}</b></p>
+      ${q.selectedIndex !== null && !q.isCorrect ? `<p class="ans-line">আপনার উত্তর: <b>${LABELS[q.selectedIndex]}. ${q.options[q.selectedIndex]}</b></p>` : ""}
+    `;
+    list.appendChild(div);
+  });
+}
+
+document.getElementById("btn-home-from-result").onclick = () => { loadExamList(); show("view-home"); };
+document.getElementById("btn-merit-from-result").onclick = () => loadMerit(currentExam.id);
+
+// ---------------- MERIT LIST ----------------
+async function loadMerit(examId) {
+  const res = await fetch(`/api/exams/${examId}/merit`);
+  const rows = await res.json();
+  const wrap = document.getElementById("merit-rows");
+  if (rows.length === 0) {
+    wrap.innerHTML = `<p class="empty-note">এখনও কেউ এই পরীক্ষা জমা দেয়নি।</p>`;
+  } else {
+    wrap.innerHTML = rows.map((r) => `
+      <div class="rank-row">
+        <div class="rank-num ${r.rank === 1 ? "g1" : r.rank === 2 ? "g2" : r.rank === 3 ? "g3" : ""}">${r.rank}</div>
+        <div class="rank-name">${r.name}</div>
+        <div class="rank-score">${r.score}</div>
+      </div>
+    `).join("");
+  }
+  show("view-merit");
+}
+document.getElementById("btn-home-from-merit").onclick = () => { loadExamList(); show("view-home"); };
+
+// ---------------- INIT ----------------
+loadExamList();
+
+// ================= ADMIN =================
+let adminExamId = null;
+let adminSectionNames = ["বাংলা", "ইংরেজি", "গণিত", "সাধারণ জ্ঞান"];
+
+document.getElementById("btn-open-admin").onclick = () => {
+  document.getElementById("admin-title").value = "";
+  document.getElementById("admin-duration").value = "30";
+  document.getElementById("admin-negative").value = "0.25";
+  setExamType("live");
+  show("view-admin-create");
+};
+document.getElementById("btn-cancel-admin").onclick = () => { loadExamList(); show("view-home"); };
+
+let selectedType = "live";
+function setExamType(t) {
+  selectedType = t;
+  document.getElementById("type-live").classList.toggle("active", t === "live");
+  document.getElementById("type-model").classList.toggle("active", t === "model");
+}
+document.getElementById("type-live").onclick = () => setExamType("live");
+document.getElementById("type-model").onclick = () => setExamType("model");
+
+document.getElementById("btn-create-exam").onclick = async () => {
+  const title = document.getElementById("admin-title").value.trim();
+  if (!title) { alert("পরীক্ষার নাম দিন"); return; }
+  const res = await fetch("/api/exams", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      type: selectedType,
+      durationMinutes: document.getElementById("admin-duration").value,
+      negativeMark: document.getElementById("admin-negative").value,
+    }),
+  });
+  const data = await res.json();
+  adminExamId = data.id;
+
+  const sel = document.getElementById("admin-section");
+  sel.innerHTML = adminSectionNames.map((n) => `<option value="${n}">${n}</option>`).join("");
+  document.getElementById("admin-bulk-text").value = "";
+  document.getElementById("admin-bulk-result").classList.add("hidden");
+  show("view-admin-questions");
+};
+
+document.getElementById("btn-finish-admin").onclick = () => { adminExamId = null; loadExamList(); show("view-home"); };
+
+// একগুচ্ছ প্রশ্ন টেক্সট থেকে পার্স করা
+function parseBulkQuestions(rawText) {
+  const blocks = rawText.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const results = [];
+  const errorBlocks = [];
+  const optionPrefix = /^[কখগঘabcdABCD][.)\-–]\s*/;
+  const answerLineRe = /^(উত্তর|answer|সঠিক উত্তর|সঠিক)[:：\-\s]/i;
+  const ansCharMap = { ক: 0, খ: 1, গ: 2, ঘ: 3, a: 0, b: 1, c: 2, d: 3, A: 0, B: 1, C: 2, D: 3 };
+
+  for (const block of blocks) {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 5) { errorBlocks.push(block); continue; }
+
+    const answerLineIdx = lines.findIndex((l) => answerLineRe.test(l));
+    if (answerLineIdx === -1) { errorBlocks.push(block); continue; }
+
+    const answerLine = lines[answerLineIdx];
+    const afterColon = answerLine.split(/[:：\-]/).slice(1).join(":").trim();
+    const ansCharMatch = afterColon.match(/[কখগঘabcdABCD]/);
+    if (!ansCharMatch) { errorBlocks.push(block); continue; }
+    const correctIndex = ansCharMap[ansCharMatch[0]];
+    if (correctIndex === undefined) { errorBlocks.push(block); continue; }
+
+    const nonAnswerLines = lines.filter((_, i) => i !== answerLineIdx);
+    const text = nonAnswerLines[0].replace(/^\d+[).\s]*/, "").trim();
+    const optionLines = nonAnswerLines.slice(1, 5);
+    if (optionLines.length !== 4) { errorBlocks.push(block); continue; }
+    const options = optionLines.map((l) => l.replace(optionPrefix, "").trim());
+    if (options.some((o) => !o)) { errorBlocks.push(block); continue; }
+
+    results.push({ text, options, correctIndex });
+  }
+  return { results, errorBlocks };
+}
+
+document.getElementById("btn-bulk-add").onclick = async () => {
+  const raw = document.getElementById("admin-bulk-text").value;
+  const { results, errorBlocks } = parseBulkQuestions(raw);
+  const resultBox = document.getElementById("admin-bulk-result");
+
+  if (results.length > 0) {
+    const sectionName = document.getElementById("admin-section").value;
+    const res = await fetch(`/api/exams/${adminExamId}/questions/bulk`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionName, questions: results }),
+    });
+    await res.json();
+    document.getElementById("admin-bulk-text").value = errorBlocks.length > 0 ? errorBlocks.join("\n\n") : "";
+  }
+
+  resultBox.classList.remove("hidden");
+  resultBox.className = "bulk-result " + (errorBlocks.length > 0 ? "warn" : "ok");
+  resultBox.textContent = `✓ ${results.length}টি প্রশ্ন যোগ হয়েছে` + (errorBlocks.length > 0 ? ` · ⚠️ ${errorBlocks.length}টি ফরম্যাট মেলেনি (নিচের বক্সে রাখা আছে)` : "");
+};
