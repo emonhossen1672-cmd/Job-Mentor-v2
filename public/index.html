@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+            <!DOCTYPE html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
@@ -21,7 +21,9 @@
       <div class="headline">আজই বসুন <b>লাইভ পরীক্ষায়</b><br>প্রকৃত প্রশ্নের আদলে</div>
     </header>
 
-    <div id="exam-list" class="tiles" style="padding-top:20px;">
+    <div id="category-chips" class="chip-row"></div>
+    <div id="grade-chips" class="chip-row"></div>
+    <div id="exam-list" class="tiles" style="padding-top:8px;">
       <!-- exam cards injected here -->
     </div>
 
@@ -51,6 +53,27 @@
 
         <label class="field-label">পরীক্ষার নাম</label>
         <input id="admin-title" type="text" placeholder="যেমন: ৪৩তম বিসিএস প্রিলি" class="input" />
+
+        <label class="field-label">ক্যাটাগরি (মন্ত্রণালয়/প্রতিষ্ঠান/পরীক্ষার নাম)</label>
+        <input id="admin-category" type="text" placeholder="যেমন: বিসিএস, স্বাস্থ্য মন্ত্রণালয়, বাংলাদেশ ব্যাংক" class="input" list="category-suggestions" />
+        <datalist id="category-suggestions">
+          <option value="বিসিএস"></option>
+          <option value="ব্যাংক জব"></option>
+          <option value="প্রাইমারি শিক্ষক নিয়োগ"></option>
+          <option value="শিক্ষক নিবন্ধন"></option>
+          <option value="স্বাস্থ্য মন্ত্রণালয়"></option>
+          <option value="পুলিশ/আনসার"></option>
+        </datalist>
+
+        <label class="field-label">গ্রেড</label>
+        <input id="admin-grade" type="text" placeholder="যেমন: ৯ম গ্রেড, ১০ম গ্রেড, ১৩তম গ্রেড" class="input" list="grade-suggestions" />
+        <datalist id="grade-suggestions">
+          <option value="৯ম গ্রেড"></option>
+          <option value="১০ম গ্রেড"></option>
+          <option value="১১তম গ্রেড"></option>
+          <option value="১২তম-১৩তম গ্রেড"></option>
+          <option value="১৪তম-২০তম গ্রেড"></option>
+        </datalist>
 
         <label class="field-label">ধরন</label>
         <div class="toggle-row">
