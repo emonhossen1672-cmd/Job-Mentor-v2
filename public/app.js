@@ -1,4 +1,4 @@
-      const LABELS = ["ক", "খ", "গ", "ঘ"];
+const LABELS = ["ক", "খ", "গ", "ঘ"];
 
 let currentExam = null;      // exam সহ প্রশ্ন (options সহ, correctIndex ছাড়া)
 let flatQuestions = [];
@@ -242,7 +242,10 @@ function renderResult(data) {
   });
 }
 
-document.getElementById("btn-home-from-result").onclick = () => { loadExamList(); show("view-home"); };
+document.getElementById("btn-home-from-result").onclick = () => {
+  if (activeCourseId) { refreshCourseProgress(); }
+  else { loadExamList(); loadCourses(); show("view-home"); }
+};
 document.getElementById("btn-merit-from-result").onclick = () => loadMerit(currentExam.id);
 
 // ---------------- MERIT LIST ----------------
@@ -271,6 +274,7 @@ loadExamList();
 // ================= ADMIN =================
 let adminExamId = null;
 let adminSectionNames = ["বাংলা", "ইংরেজি", "গণিত", "সাধারণ জ্ঞান"];
+let adminReturnScreen = "view-home";
 
 document.getElementById("btn-open-admin").onclick = () => {
   document.getElementById("admin-title").value = "";
@@ -278,10 +282,11 @@ document.getElementById("btn-open-admin").onclick = () => {
   document.getElementById("admin-grade").value = "";
   document.getElementById("admin-duration").value = "30";
   document.getElementById("admin-negative").value = "0.25";
+  adminReturnScreen = "view-home";
   setExamType("live");
   show("view-admin-create");
 };
-document.getElementById("btn-cancel-admin").onclick = () => { loadExamList(); show("view-home"); };
+document.getElementById("btn-cancel-admin").onclick = () => { loadExamList(); loadCourses(); show("view-home"); };
 
 let selectedType = "live";
 function setExamType(t) {
@@ -309,6 +314,8 @@ document.getElementById("btn-create-exam").onclick = async () => {
   });
   const data = await res.json();
   adminExamId = data.id;
+  adminReturnScreen = "view-home";
+  adminSectionNames = ["বাংলা", "ইংরেজি", "গণিত", "সাধারণ জ্ঞান"];
 
   const sel = document.getElementById("admin-section");
   sel.innerHTML = adminSectionNames.map((n) => `<option value="${n}">${n}</option>`).join("");
@@ -317,7 +324,17 @@ document.getElementById("btn-create-exam").onclick = async () => {
   show("view-admin-questions");
 };
 
-document.getElementById("btn-finish-admin").onclick = () => { adminExamId = null; loadExamList(); show("view-home"); };
+document.getElementById("btn-finish-admin").onclick = () => {
+  adminExamId = null;
+  if (adminReturnScreen === "view-course-admin-parts") {
+    renderCoursePartsExisting();
+    show("view-course-admin-parts");
+  } else {
+    loadExamList();
+    loadCourses();
+    show("view-home");
+  }
+};
 
 // একগুচ্ছ প্রশ্ন টেক্সট থেকে পার্স করা
 function parseBulkQuestions(rawText) {
@@ -374,3 +391,206 @@ document.getElementById("btn-bulk-add").onclick = async () => {
   resultBox.className = "bulk-result " + (errorBlocks.length > 0 ? "warn" : "ok");
   resultBox.textContent = `✓ ${results.length}টি প্রশ্ন যোগ হয়েছে` + (errorBlocks.length > 0 ? ` · ⚠️ ${errorBlocks.length}টি ফরম্যাট মেলেনি (নিচের বক্সে রাখা আছে)` : "");
 };
+
+// ================= সিরিজ পরীক্ষা (COURSES) =================
+
+async function loadCourses() {
+  const res = await fetch("/api/courses");
+  const courses = await res.json();
+  const wrap = document.getElementById("course-list");
+  const label = document.getElementById("course-section-label");
+  if (courses.length === 0) {
+    wrap.innerHTML = "";
+    label.classList.add("hidden");
+    return;
+  }
+  label.classList.remove("hidden");
+  wrap.innerHTML = "";
+  courses.forEach((c) => {
+    const btn = document.createElement("button");
+    btn.className = "tile b2";
+    btn.innerHTML = `
+      <div class="badge">📚</div>
+      <div class="cat-tag">সিরিজ · ${c.category}${c.grade ? " · " + c.grade : ""}</div>
+      <div class="t-title">${c.title}</div>
+      <div class="t-sub">${c.partsCount}টি পরীক্ষা</div>
+    `;
+    btn.onclick = () => openCourse(c.id);
+    wrap.appendChild(btn);
+  });
+}
+
+// ---- Admin: create course ----
+let activeCourseAdminId = null;
+let coursePartsSoFar = [];
+
+document.getElementById("btn-open-course-admin").onclick = () => {
+  document.getElementById("course-admin-title").value = "";
+  document.getElementById("course-admin-category").value = "";
+  document.getElementById("course-admin-grade").value = "";
+  show("view-course-admin-create");
+};
+document.getElementById("btn-cancel-course-admin").onclick = () => { loadExamList(); loadCourses(); show("view-home"); };
+
+document.getElementById("btn-course-admin-create").onclick = async () => {
+  const title = document.getElementById("course-admin-title").value.trim();
+  if (!title) { alert("কোর্সের নাম দিন"); return; }
+  const res = await fetch("/api/courses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      category: document.getElementById("course-admin-category").value,
+      grade: document.getElementById("course-admin-grade").value,
+    }),
+  });
+  const data = await res.json();
+  activeCourseAdminId = data.id;
+  coursePartsSoFar = [];
+  document.getElementById("course-admin-parts-title").textContent = title;
+  renderCoursePartsExisting();
+  document.getElementById("part-title").value = "পরীক্ষা-০১";
+  document.getElementById("part-duration").value = "20";
+  document.getElementById("part-syllabus").value = "";
+  show("view-course-admin-parts");
+};
+
+function renderCoursePartsExisting() {
+  const wrap = document.getElementById("course-admin-parts-existing");
+  if (coursePartsSoFar.length === 0) {
+    wrap.innerHTML = `<p class="empty-note">এখনও কোনো পরীক্ষা যোগ হয়নি।</p>`;
+    return;
+  }
+  wrap.innerHTML =
+    `<p class="field-label" style="margin-top:0;">যোগ হয়েছে (${coursePartsSoFar.length}টি)</p>` +
+    coursePartsSoFar.map((t) => `<span class="chip" style="margin:0 6px 6px 0;">${t}</span>`).join("");
+}
+
+document.getElementById("btn-create-part").onclick = async () => {
+  const title = document.getElementById("part-title").value.trim();
+  if (!title) { alert("পরীক্ষার নাম দিন"); return; }
+  const res = await fetch(`/api/courses/${activeCourseAdminId}/parts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      durationMinutes: document.getElementById("part-duration").value,
+      syllabus: document.getElementById("part-syllabus").value,
+    }),
+  });
+  const data = await res.json();
+  adminExamId = data.id;
+  adminReturnScreen = "view-course-admin-parts";
+  coursePartsSoFar.push(title);
+
+  adminSectionNames = ["প্রশ্ন"];
+  const sel = document.getElementById("admin-section");
+  sel.innerHTML = adminSectionNames.map((n) => `<option value="${n}">${n}</option>`).join("");
+  document.getElementById("admin-bulk-text").value = "";
+  document.getElementById("admin-bulk-result").classList.add("hidden");
+  show("view-admin-questions");
+
+  // পরের পরীক্ষার নাম অনুমান করে বসিয়ে দেওয়া
+  const nextNum = coursePartsSoFar.length + 1;
+  document.getElementById("part-title").value = "পরীক্ষা-" + String(nextNum).padStart(2, "0");
+  document.getElementById("part-syllabus").value = "";
+};
+
+document.getElementById("btn-finish-course").onclick = () => {
+  activeCourseAdminId = null;
+  loadExamList();
+  loadCourses();
+  show("view-home");
+};
+
+// ---- Learner: view course, take parts in order ----
+let activeCourseId = null;
+let courseMeta = null;
+
+function openCourse(courseId) {
+  activeCourseId = courseId;
+  document.getElementById("course-name-input").value = studentName;
+  document.getElementById("course-name-block").classList.remove("hidden");
+  document.getElementById("course-parts-list").classList.add("hidden");
+  show("view-course-detail");
+}
+
+document.getElementById("btn-course-name-continue").onclick = async () => {
+  const name = document.getElementById("course-name-input").value.trim();
+  if (!name) { alert("নাম লিখুন"); return; }
+  studentName = name;
+  await refreshCourseProgress();
+};
+
+async function refreshCourseProgress() {
+  const res = await fetch(`/api/courses/${activeCourseId}`);
+  courseMeta = await res.json();
+  document.getElementById("course-detail-title").textContent = courseMeta.title;
+
+  const progRes = await fetch(`/api/courses/${activeCourseId}/progress?name=${encodeURIComponent(studentName)}`);
+  const prog = await progRes.json();
+  renderCourseParts(courseMeta.parts, prog.completedPartIds);
+
+  document.getElementById("course-name-block").classList.add("hidden");
+  document.getElementById("course-parts-list").classList.remove("hidden");
+  show("view-course-detail");
+}
+
+function renderCourseParts(parts, completedIds) {
+  const wrap = document.getElementById("course-parts-list");
+  if (parts.length === 0) {
+    wrap.innerHTML = `<p class="empty-note">এই কোর্সে এখনও কোনো পরীক্ষা যোগ হয়নি।</p>`;
+    return;
+  }
+  wrap.innerHTML = parts
+    .map((p, idx) => {
+      const done = completedIds.includes(p.id);
+      const unlocked = idx === 0 || completedIds.includes(parts[idx - 1].id);
+      let statusHtml;
+      if (done) {
+        statusHtml = `<span class="chip" style="background:#DFF6E7;color:var(--green);border-color:#DFF6E7;">✓ সম্পন্ন</span>`;
+      } else if (unlocked) {
+        statusHtml = `<button class="btn-primary" style="width:auto;padding:8px 16px;margin:0;" data-part="${p.id}">শুরু করুন</button>`;
+      } else {
+        statusHtml = `<span class="chip">🔒 লক</span>`;
+      }
+      return `
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <div>
+              <div style="font-weight:600;font-size:14px;color:var(--ink);">${p.title}</div>
+              <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${p.durationMinutes} মিনিট · ${p.totalQuestions}টি প্রশ্ন</div>
+              ${p.syllabus ? `<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">সিলেবাস: ${p.syllabus}</div>` : ""}
+            </div>
+            <div>${statusHtml}</div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  wrap.querySelectorAll("[data-part]").forEach((btn) => {
+    btn.onclick = () => startCoursePart(btn.dataset.part);
+  });
+}
+
+async function startCoursePart(examId) {
+  lastExamId = examId;
+  const res = await fetch(`/api/exams/${examId}`);
+  currentExam = await res.json();
+  flatQuestions = currentExam.sections.flatMap((s) => s.questions.map((q) => ({ ...q, section: s.name })));
+  currentIndex = 0;
+  answers = {};
+  marked = {};
+  secondsLeft = currentExam.durationMinutes * 60;
+  document.getElementById("exam-title").textContent = currentExam.title;
+  renderQuestion();
+  renderPanel();
+  startTimer();
+  show("view-exam");
+}
+
+document.getElementById("btn-home-from-course").onclick = () => { activeCourseId = null; loadExamList(); loadCourses(); show("view-home"); };
+
+// ---- INIT (courses) ----
+loadCourses();
