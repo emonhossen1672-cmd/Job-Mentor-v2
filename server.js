@@ -46,6 +46,7 @@ function listExams(req, res) {
   const exams = data.exams.map((e) => ({
     id: e.id,
     title: e.title,
+    category: e.category || 'সাধারণ',
     durationMinutes: e.durationMinutes,
     totalQuestions: e.sections.reduce((n, s) => n + s.questions.length, 0),
   }));
@@ -149,6 +150,7 @@ async function createExam(req, res) {
   const exam = {
     id: newId('exam'),
     title,
+    category: (body.category || '').trim() || 'সাধারণ',
     type: body.type === 'model' ? 'model' : 'live',
     durationMinutes: Number(body.durationMinutes) || 30,
     negativeMark: Number(body.negativeMark) || 0,
