@@ -1,4 +1,4 @@
-// server.js
+             // server.js
 // এই সার্ভারটা চালাতে কোনো npm install লাগবে না — শুধু Node.js থাকলেই চলবে।
 // রান করতে: node server.js   (তারপর ব্রাউজারে http://localhost:3000 খুলুন)
 
@@ -47,6 +47,7 @@ function listExams(req, res) {
     id: e.id,
     title: e.title,
     category: e.category || 'সাধারণ',
+    grade: e.grade || '',
     durationMinutes: e.durationMinutes,
     totalQuestions: e.sections.reduce((n, s) => n + s.questions.length, 0),
   }));
@@ -151,6 +152,7 @@ async function createExam(req, res) {
     id: newId('exam'),
     title,
     category: (body.category || '').trim() || 'সাধারণ',
+    grade: (body.grade || '').trim(),
     type: body.type === 'model' ? 'model' : 'live',
     durationMinutes: Number(body.durationMinutes) || 30,
     negativeMark: Number(body.negativeMark) || 0,
@@ -248,4 +250,4 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Exam Hub চালু হয়েছে → http://localhost:${PORT}`);
-});
+}); 
