@@ -1,0 +1,41 @@
+{
+  "exams": [
+    {
+      "id": "bcs-42-prelim",
+      "title": "৪২তম বিসিএস প্রিলিমিনারি (ডেমো)",
+      "durationMinutes": 10,
+      "negativeMark": 0.25,
+      "sections": [
+        {
+          "name": "বাংলা",
+          "questions": [
+            { "id": "b1", "text": "'সুন্দর' শব্দের বিপরীত শব্দ কোনটি?", "options": ["কুৎসিত", "সুশ্রী", "মনোরম", "চারু"], "correctIndex": 0 },
+            { "id": "b2", "text": "'যা বলা হয়নি' — এক কথায় প্রকাশ করুন।", "options": ["অনুক্ত", "অব্যক্ত", "অকথিত", "অনুচ্চারিত"], "correctIndex": 0 }
+          ]
+        },
+        {
+          "name": "ইংরেজি",
+          "questions": [
+            { "id": "e1", "text": "Choose the correct synonym of 'Ubiquitous'.", "options": ["Rare", "Omnipresent", "Hidden", "Ancient"], "correctIndex": 1 },
+            { "id": "e2", "text": "Fill in the blank: He is senior __ me.", "options": ["than", "to", "from", "with"], "correctIndex": 1 }
+          ]
+        },
+        {
+          "name": "গণিত",
+          "questions": [
+            { "id": "m1", "text": "একটি সংখ্যার ৩০% = ৯০ হলে সংখ্যাটি কত?", "options": ["২৭০", "৩০০", "৩৩০", "৩৬০"], "correctIndex": 1 },
+            { "id": "m2", "text": "x + 5 = 12 হলে x এর মান কত?", "options": ["5", "6", "7", "8"], "correctIndex": 2 }
+          ]
+        },
+        {
+          "name": "সাধারণ জ্ঞান",
+          "questions": [
+            { "id": "g1", "text": "বাংলাদেশের স্বাধীনতা যুদ্ধ শুরু হয় কোন সালে?", "options": ["১৯৭০", "১৯৭১", "১৯৭২", "১৯৬৯"], "correctIndex": 1 },
+            { "id": "g2", "text": "বাংলাদেশের সংবিধান কার্যকর হয় কবে?", "options": ["১৬ ডিসেম্বর ১৯৭২", "৪ নভেম্বর ১৯৭২", "২৬ মার্চ ১৯৭১", "১৭ এপ্রিল ১৯৭১"], "correctIndex": 1 }
+          ]
+        }
+      ]
+    }
+  ],
+  "submissions": []
+}
