@@ -1,4 +1,4 @@
-             // server.js
+// server.js
 // এই সার্ভারটা চালাতে কোনো npm install লাগবে না — শুধু Node.js থাকলেই চলবে।
 // রান করতে: node server.js   (তারপর ব্রাউজারে http://localhost:3000 খুলুন)
 
@@ -18,7 +18,9 @@ const MIME = {
 };
 
 function readData() {
-  return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+  if (!data.courses) data.courses = [];
+  return data;
 }
 function writeData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
@@ -43,14 +45,16 @@ function readBody(req) {
 
 function listExams(req, res) {
   const data = readData();
-  const exams = data.exams.map((e) => ({
-    id: e.id,
-    title: e.title,
-    category: e.category || 'সাধারণ',
-    grade: e.grade || '',
-    durationMinutes: e.durationMinutes,
-    totalQuestions: e.sections.reduce((n, s) => n + s.questions.length, 0),
-  }));
+  const exams = data.exams
+    .filter((e) => !e.courseId)
+    .map((e) => ({
+      id: e.id,
+      title: e.title,
+      category: e.category || 'সাধারণ',
+      grade: e.grade || '',
+      durationMinutes: e.durationMinutes,
+      totalQuestions: e.sections.reduce((n, s) => n + s.questions.length, 0),
+    }));
   sendJSON(res, 200, exams);
 }
 
@@ -131,6 +135,116 @@ function getMerit(req, res, examId) {
     .sort((a, b) => b.score - a.score)
     .map((s, i) => ({ rank: i + 1, name: s.name, score: s.score, submittedAt: s.submittedAt }));
   sendJSON(res, 200, list);
+}
+
+// ---------- সিরিজ পরীক্ষা (কোর্স) ----------
+
+function listCourses(req, res) {
+  const data = readData();
+  const courses = (data.courses || []).map((c) => ({
+    id: c.id,
+    title: c.title,
+    category: c.category || 'সাধারণ',
+    grade: c.grade || '',
+    partsCount: c.partIds.length,
+  }));
+  sendJSON(res, 200, courses);
+}
+
+function getCourseDetail(req, res, courseId) {
+  const data = readData();
+  const course = (data.courses || []).find((c) => c.id === courseId);
+  if (!course) return sendJSON(res, 404, { message: 'কোর্স পাওয়া যায়নি' });
+
+  const parts = course.partIds
+    .map((pid) => {
+      const ex = data.exams.find((e) => e.id === pid);
+      if (!ex) return null;
+      return {
+        id: ex.id,
+        title: ex.title,
+        syllabus: ex.syllabus || '',
+        durationMinutes: ex.durationMinutes,
+        totalQuestions: ex.sections.reduce((n, s) => n + s.questions.length, 0),
+      };
+    })
+    .filter(Boolean);
+
+  sendJSON(res, 200, {
+    id: course.id,
+    title: course.title,
+    category: course.category || 'সাধারণ',
+    grade: course.grade || '',
+    parts,
+  });
+}
+
+async function createCourse(req, res) {
+  let body;
+  try { body = await readBody(req); }
+  catch { return sendJSON(res, 400, { message: 'ভুল ডেটা পাঠানো হয়েছে' }); }
+
+  const title = (body.title || '').trim();
+  if (!title) return sendJSON(res, 400, { message: 'কোর্সের নাম দিতে হবে' });
+
+  const course = {
+    id: newId('course'),
+    title,
+    category: (body.category || '').trim() || 'সাধারণ',
+    grade: (body.grade || '').trim(),
+    partIds: [],
+  };
+
+  const data = readData();
+  if (!data.courses) data.courses = [];
+  data.courses.unshift(course);
+  writeData(data);
+
+  sendJSON(res, 200, { id: course.id });
+}
+
+async function addCoursePart(req, res, courseId) {
+  let body;
+  try { body = await readBody(req); }
+  catch { return sendJSON(res, 400, { message: 'ভুল ডেটা পাঠানো হয়েছে' }); }
+
+  const title = (body.title || '').trim();
+  if (!title) return sendJSON(res, 400, { message: 'পরীক্ষার নাম দিতে হবে' });
+
+  const data = readData();
+  const course = (data.courses || []).find((c) => c.id === courseId);
+  if (!course) return sendJSON(res, 404, { message: 'কোর্স পাওয়া যায়নি' });
+
+  const part = {
+    id: newId('exam'),
+    title,
+    courseId,
+    syllabus: (body.syllabus || '').trim(),
+    type: 'live',
+    durationMinutes: Number(body.durationMinutes) || 20,
+    negativeMark: Number(body.negativeMark) || 0,
+    sections: [{ name: 'প্রশ্ন', questions: [] }],
+  };
+
+  data.exams.unshift(part);
+  course.partIds.push(part.id);
+  writeData(data);
+
+  sendJSON(res, 200, { id: part.id });
+}
+
+function getCourseProgress(req, res, courseId, name) {
+  const data = readData();
+  const course = (data.courses || []).find((c) => c.id === courseId);
+  if (!course) return sendJSON(res, 404, { message: 'কোর্স পাওয়া যায়নি' });
+
+  const norm = (s) => (s || '').trim().toLowerCase();
+  const target = norm(name);
+  const completedPartIds = course.partIds.filter((pid) =>
+    data.submissions.some((s) => s.examId === pid && norm(s.name) === target)
+  );
+
+  sendJSON(res, 200, { completedPartIds });
 }
 
 const DEFAULT_SECTION_NAMES = ['বাংলা', 'ইংরেজি', 'গণিত', 'সাধারণ জ্ঞান'];
@@ -239,6 +353,18 @@ const server = http.createServer(async (req, res) => {
     m = p.match(/^\/api\/exams\/([^/]+)\/questions\/bulk$/);
     if (m && req.method === 'POST') return await bulkAddQuestions(req, res, m[1]);
 
+    if (p === '/api/courses' && req.method === 'GET') return listCourses(req, res);
+    if (p === '/api/courses' && req.method === 'POST') return await createCourse(req, res);
+
+    m = p.match(/^\/api\/courses\/([^/]+)$/);
+    if (m && req.method === 'GET') return getCourseDetail(req, res, m[1]);
+
+    m = p.match(/^\/api\/courses\/([^/]+)\/parts$/);
+    if (m && req.method === 'POST') return await addCoursePart(req, res, m[1]);
+
+    m = p.match(/^\/api\/courses\/([^/]+)\/progress$/);
+    if (m && req.method === 'GET') return getCourseProgress(req, res, m[1], url.searchParams.get('name') || '');
+
     if (p.startsWith('/api/')) return sendJSON(res, 404, { message: 'রুট পাওয়া যায়নি' });
 
     return serveStatic(req, res, p);
@@ -250,4 +376,4 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Exam Hub চালু হয়েছে → http://localhost:${PORT}`);
-}); 
+});
