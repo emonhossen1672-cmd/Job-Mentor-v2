@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exam Hub — চাকরির পরীক্ষার প্রস্তুতি</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Baloo+Da+2:wght@600;700;800&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="phone" id="app">
+  <!-- ---------------- HOME ---------------- -->
+  <section class="view" id="view-home">
+    <header>
+      <div class="brand-row">
+        <div class="brand">Exam<span>Hub</span></div>
+      </div>
+      <div class="tagline">Learn · Practice · Achieve</div>
+      <div class="headline">আজই বসুন <b>লাইভ পরীক্ষায়</b><br>প্রকৃত প্রশ্নের আদলে</div>
+    </header>
+
+    <div id="exam-list" class="tiles" style="padding-top:20px;">
+      <!-- exam cards injected here -->
+    </div>
+
+    <div class="sec-label">অন্যান্য</div>
+    <div class="tiles">
+      <button class="tile b3" id="btn-merit">
+        <div class="badge">🏆</div>
+        <div class="t-title">মেরিট লিস্ট</div>
+        <div class="t-sub">সবার ফলাফল দেখুন</div>
+      </button>
+      <button class="tile b4" id="btn-refresh">
+        <div class="badge">↻</div>
+        <div class="t-title">রিফ্রেশ</div>
+        <div class="t-sub">পরীক্ষার তালিকা</div>
+      </button>
+    </div>
+
+    <button class="admin-add-btn" id="btn-open-admin">+ নতুন পরীক্ষা / প্রশ্ন যোগ করুন</button>
+  </section>
+
+  <!-- ---------------- ADMIN: CREATE EXAM ---------------- -->
+  <section class="view hidden" id="view-admin-create">
+    <div class="center-pad">
+      <div class="card">
+        <h2>নতুন পরীক্ষা তৈরি করুন</h2>
+        <p class="muted">প্রথমে পরীক্ষার মূল তথ্য দিন, পরের ধাপে প্রশ্ন যোগ করবেন</p>
+
+        <label class="field-label">পরীক্ষার নাম</label>
+        <input id="admin-title" type="text" placeholder="যেমন: ৪৩তম বিসিএস প্রিলি" class="input" />
+
+        <label class="field-label">ধরন</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="type-live" data-type="live">লাইভ পরীক্ষা</button>
+          <button class="toggle-btn" id="type-model" data-type="model">মডেল টেস্ট</button>
+        </div>
+
+        <label class="field-label">সময়সীমা (মিনিট)</label>
+        <input id="admin-duration" type="number" value="30" class="input" />
+
+        <label class="field-label">ভুল উত্তরে নেগেটিভ মার্ক (না চাইলে ০)</label>
+        <input id="admin-negative" type="number" step="0.05" value="0.25" class="input" />
+
+        <button class="btn-primary" id="btn-create-exam">পরবর্তী: প্রশ্ন যোগ করুন</button>
+        <button class="btn-ghost" id="btn-cancel-admin">বাতিল</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- ADMIN: ADD QUESTIONS ---------------- -->
+  <section class="view hidden" id="view-admin-questions">
+    <header>
+      <div class="brand-row"><div class="brand">Exam<span>Hub</span></div></div>
+      <div class="headline">প্রশ্ন যোগ করুন</div>
+    </header>
+    <div class="card" style="margin:-14px 22px 18px;">
+      <label class="field-label">বিষয়</label>
+      <select id="admin-section" class="input"></select>
+
+      <div class="bulk-hint">
+        <p>এই ফরম্যাটে পেস্ট করুন (প্রতিটা প্রশ্নের মাঝে একটা খালি লাইন দিন):</p>
+        <pre>সুন্দর শব্দের বিপরীত শব্দ কোনটি?
+ক. কুৎসিত
+খ. সুশ্রী
+গ. মনোরম
+ঘ. চারু
+উত্তর: ক</pre>
+      </div>
+
+      <textarea id="admin-bulk-text" rows="10" placeholder="এখানে অনেকগুলো প্রশ্ন একসাথে পেস্ট করুন..." class="input" style="font-family:monospace;"></textarea>
+      <div id="admin-bulk-result" class="bulk-result hidden"></div>
+      <button class="btn-primary" id="btn-bulk-add">⚡ সবগুলো একসাথে যোগ করুন</button>
+    </div>
+    <div style="padding:0 22px;">
+      <button class="btn-primary" id="btn-finish-admin" style="background:var(--navy);">✓ সম্পন্ন — হোমে ফিরুন</button>
+    </div>
+  </section>
+
+  <!-- ---------------- NAME PROMPT ---------------- -->
+  <section class="view hidden" id="view-name">
+    <div class="center-pad">
+      <div class="card">
+        <h2>শুরু করার আগে</h2>
+        <p class="muted">আপনার নাম লিখুন — এটা মেরিট লিস্টে দেখানো হবে</p>
+        <input id="name-input" type="text" placeholder="আপনার নাম" class="input" />
+        <button class="btn-primary" id="btn-start-exam">পরীক্ষা শুরু করুন</button>
+        <button class="btn-ghost" id="btn-cancel-name">বাতিল</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- EXAM ---------------- -->
+  <section class="view hidden" id="view-exam">
+    <header class="exam-header">
+      <div>
+        <div class="live-badge">
+          <span class="live-ring"><span class="pulse"></span><span class="core"></span></span>
+          লাইভ পরীক্ষা
+        </div>
+        <h1 id="exam-title"></h1>
+      </div>
+      <div class="timer" id="timer">00:00</div>
+    </header>
+    <div class="progress-line">
+      <span id="progress-text"></span>
+      <span id="answered-text"></span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+
+    <main class="exam-main">
+      <div class="card q-card">
+        <span class="pill" id="q-section"></span>
+        <p class="q-text" id="q-text"></p>
+        <div id="q-options" class="options"></div>
+        <button class="mark-btn" id="btn-mark">🚩 পরে রিভিউ করার জন্য চিহ্নিত করুন</button>
+      </div>
+
+      <p class="panel-label">প্রশ্ন প্যানেল</p>
+      <div class="q-panel" id="q-panel"></div>
+    </main>
+
+    <div class="bottom-bar">
+      <button class="btn-outline" id="btn-prev">পূর্ববর্তী</button>
+      <button class="btn-primary" id="btn-next">পরবর্তী</button>
+      <button class="btn-success hidden" id="btn-submit">জমা দিন</button>
+    </div>
+  </section>
+
+  <!-- ---------------- RESULT ---------------- -->
+  <section class="view hidden" id="view-result">
+    <header>
+      <div class="brand-row"><div class="brand">Exam<span>Hub</span></div></div>
+      <div class="headline">ফলাফল ও ভুল মার্কিং</div>
+    </header>
+    <div class="result-summary" id="result-summary"></div>
+    <p class="sec-label">প্রশ্নভিত্তিক পর্যালোচনা</p>
+    <div id="result-list" class="result-list"></div>
+    <div class="bottom-bar">
+      <button class="btn-outline" id="btn-home-from-result">হোমে ফিরুন</button>
+      <button class="btn-primary" id="btn-merit-from-result">মেরিট লিস্ট দেখুন</button>
+    </div>
+  </section>
+
+  <!-- ---------------- MERIT LIST ---------------- -->
+  <section class="view hidden" id="view-merit">
+    <header>
+      <div class="brand-row"><div class="brand">Exam<span>Hub</span></div></div>
+      <div class="headline">মেরিট লিস্ট</div>
+    </header>
+    <div class="merit-card">
+      <div id="merit-rows"></div>
+    </div>
+    <div class="bottom-bar">
+      <button class="btn-primary" id="btn-home-from-merit" style="width:100%">হোমে ফিরুন</button>
+    </div>
+  </section>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
