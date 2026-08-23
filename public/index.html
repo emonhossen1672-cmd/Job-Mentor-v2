@@ -1,4 +1,4 @@
-            <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8">
@@ -27,6 +27,9 @@
       <!-- exam cards injected here -->
     </div>
 
+    <div class="sec-label hidden" id="course-section-label">সিরিজ পরীক্ষা</div>
+    <div id="course-list" class="tiles"></div>
+
     <div class="sec-label">অন্যান্য</div>
     <div class="tiles">
       <button class="tile b3" id="btn-merit">
@@ -42,6 +45,7 @@
     </div>
 
     <button class="admin-add-btn" id="btn-open-admin">+ নতুন পরীক্ষা / প্রশ্ন যোগ করুন</button>
+    <button class="admin-add-btn" id="btn-open-course-admin" style="border-color:#FFD59A; color:#B4740E; margin-top:-12px;">+ সিরিজ পরীক্ষা তৈরি করুন</button>
   </section>
 
   <!-- ---------------- ADMIN: CREATE EXAM ---------------- -->
@@ -119,6 +123,67 @@
     </div>
     <div style="padding:0 22px;">
       <button class="btn-primary" id="btn-finish-admin" style="background:var(--navy);">✓ সম্পন্ন — হোমে ফিরুন</button>
+    </div>
+  </section>
+
+  <!-- ---------------- COURSE ADMIN: CREATE ---------------- -->
+  <section class="view hidden" id="view-course-admin-create">
+    <div class="center-pad">
+      <div class="card">
+        <h2>নতুন সিরিজ পরীক্ষা</h2>
+        <p class="muted">একটা কোর্সের নাম দিন, পরে এতে একাধিক পরীক্ষা (পরীক্ষা-০১, ০২...) যোগ করবেন</p>
+
+        <label class="field-label">কোর্সের নাম</label>
+        <input id="course-admin-title" type="text" placeholder="যেমন: জব সল্যুশন ৬ষ্ঠ খণ্ড" class="input" />
+
+        <label class="field-label">ক্যাটাগরি</label>
+        <input id="course-admin-category" type="text" class="input" list="category-suggestions" placeholder="যেমন: বিসিএস" />
+
+        <label class="field-label">গ্রেড (ঐচ্ছিক)</label>
+        <input id="course-admin-grade" type="text" class="input" list="grade-suggestions" />
+
+        <button class="btn-primary" id="btn-course-admin-create">পরবর্তী: পরীক্ষা যোগ করুন</button>
+        <button class="btn-ghost" id="btn-cancel-course-admin">বাতিল</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- COURSE ADMIN: ADD PARTS ---------------- -->
+  <section class="view hidden" id="view-course-admin-parts">
+    <header>
+      <div class="brand-row"><div class="brand">Exam<span>Hub</span></div></div>
+      <div class="headline" id="course-admin-parts-title">পরীক্ষা যোগ করুন</div>
+    </header>
+    <div style="padding:14px 22px 0;" id="course-admin-parts-existing"></div>
+    <div class="card" style="margin:14px 22px;">
+      <label class="field-label">পরীক্ষার নাম</label>
+      <input id="part-title" type="text" class="input" placeholder="যেমন: পরীক্ষা-০১" />
+      <label class="field-label">সময়সীমা (মিনিট)</label>
+      <input id="part-duration" type="number" value="20" class="input" />
+      <label class="field-label">সিলেবাস (ঐচ্ছিক)</label>
+      <input id="part-syllabus" type="text" class="input" placeholder="যেমন: প্রশ্নক্রম ৪২০ হতে ৪২৯" />
+      <button class="btn-primary" id="btn-create-part">এই পরীক্ষা তৈরি করুন → প্রশ্ন যোগ করুন</button>
+    </div>
+    <div style="padding:0 22px 90px;">
+      <button class="btn-primary" id="btn-finish-course" style="background:var(--navy);">✓ কোর্স তৈরি শেষ — হোমে ফিরুন</button>
+    </div>
+  </section>
+
+  <!-- ---------------- COURSE DETAIL (learner) ---------------- -->
+  <section class="view hidden" id="view-course-detail">
+    <header>
+      <div class="brand-row"><div class="brand">Exam<span>Hub</span></div></div>
+      <div class="headline" id="course-detail-title">সিরিজ পরীক্ষা</div>
+    </header>
+    <div class="card" style="margin:-14px 22px 18px;" id="course-name-block">
+      <label class="field-label">আপনার নাম লিখুন</label>
+      <p class="muted" style="margin-top:2px;">এই নাম দিয়েই আপনার অগ্রগতি ট্র্যাক হবে — প্রতিবার একই নাম ব্যবহার করুন</p>
+      <input id="course-name-input" type="text" placeholder="আপনার নাম" class="input" />
+      <button class="btn-primary" id="btn-course-name-continue">দেখুন</button>
+    </div>
+    <div id="course-parts-list" class="hidden" style="padding:0 22px 90px;"></div>
+    <div class="bottom-bar">
+      <button class="btn-outline" id="btn-home-from-course" style="width:100%">হোমে ফিরুন</button>
     </div>
   </section>
 
