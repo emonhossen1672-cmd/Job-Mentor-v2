@@ -1,4 +1,4 @@
-const LABELS = ["ক", "খ", "গ", "ঘ"];
+      const LABELS = ["ক", "খ", "গ", "ঘ"];
 
 let currentExam = null;      // exam সহ প্রশ্ন (options সহ, correctIndex ছাড়া)
 let flatQuestions = [];
@@ -16,16 +16,70 @@ function show(viewId) {
 }
 
 // ---------------- HOME ----------------
+let allExams = [];
+let activeCategory = "সব";
+let activeGrade = "সব";
+
 async function loadExamList() {
   const res = await fetch("/api/exams");
-  const exams = await res.json();
+  allExams = await res.json();
+  activeCategory = "সব";
+  activeGrade = "সব";
+  renderCategoryChips();
+  renderGradeChips();
+  renderExamList();
+}
+
+function renderCategoryChips() {
+  const chipWrap = document.getElementById("category-chips");
+  const categories = ["সব", ...new Set(allExams.map((e) => e.category || "সাধারণ"))];
+  chipWrap.innerHTML = categories
+    .map((c) => `<button class="chip ${c === activeCategory ? "active" : ""}" data-cat="${c}">${c}</button>`)
+    .join("");
+  chipWrap.querySelectorAll(".chip").forEach((btn) => {
+    btn.onclick = () => {
+      activeCategory = btn.dataset.cat;
+      renderCategoryChips();
+      renderGradeChips();
+      renderExamList();
+    };
+  });
+}
+
+function renderGradeChips() {
+  const chipWrap = document.getElementById("grade-chips");
+  const scoped = activeCategory === "সব" ? allExams : allExams.filter((e) => (e.category || "সাধারণ") === activeCategory);
+  const grades = ["সব", ...new Set(scoped.map((e) => e.grade).filter(Boolean))];
+  if (grades.length <= 1) { chipWrap.innerHTML = ""; return; }
+  chipWrap.innerHTML = grades
+    .map((g) => `<button class="chip chip-grade ${g === activeGrade ? "active" : ""}" data-grade="${g}">${g}</button>`)
+    .join("");
+  chipWrap.querySelectorAll(".chip").forEach((btn) => {
+    btn.onclick = () => {
+      activeGrade = btn.dataset.grade;
+      renderGradeChips();
+      renderExamList();
+    };
+  });
+}
+
+function renderExamList() {
   const wrap = document.getElementById("exam-list");
   wrap.innerHTML = "";
-  exams.forEach((e) => {
+  let filtered = activeCategory === "সব" ? allExams : allExams.filter((e) => (e.category || "সাধারণ") === activeCategory);
+  if (activeGrade !== "সব") filtered = filtered.filter((e) => e.grade === activeGrade);
+
+  if (filtered.length === 0) {
+    wrap.innerHTML = `<p class="empty-note" style="grid-column:1/-1;">এই ফিল্টারে এখনও কোনো পরীক্ষা নেই।</p>`;
+    return;
+  }
+
+  filtered.forEach((e) => {
     const btn = document.createElement("button");
     btn.className = "tile b1";
     btn.innerHTML = `
       <div class="badge">📝</div>
+      <div class="cat-tag">${e.category || "সাধারণ"}${e.grade ? " · " + e.grade : ""}</div>
       <div class="t-title">${e.title}</div>
       <div class="t-sub">${e.totalQuestions}টি প্রশ্ন · ${e.durationMinutes} মিনিট</div>
     `;
@@ -220,6 +274,8 @@ let adminSectionNames = ["বাংলা", "ইংরেজি", "গণিত"
 
 document.getElementById("btn-open-admin").onclick = () => {
   document.getElementById("admin-title").value = "";
+  document.getElementById("admin-category").value = "";
+  document.getElementById("admin-grade").value = "";
   document.getElementById("admin-duration").value = "30";
   document.getElementById("admin-negative").value = "0.25";
   setExamType("live");
@@ -244,6 +300,8 @@ document.getElementById("btn-create-exam").onclick = async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       title,
+      category: document.getElementById("admin-category").value,
+      grade: document.getElementById("admin-grade").value,
       type: selectedType,
       durationMinutes: document.getElementById("admin-duration").value,
       negativeMark: document.getElementById("admin-negative").value,
