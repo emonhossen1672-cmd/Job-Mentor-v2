@@ -414,10 +414,34 @@ async function loadCourses() {
       <div class="cat-tag">সিরিজ · ${c.category}${c.grade ? " · " + c.grade : ""}</div>
       <div class="t-title">${c.title}</div>
       <div class="t-sub">${c.partsCount}টি পরীক্ষা</div>
+      <button class="admin-plus-btn" data-course="${c.id}">+ পরীক্ষা যোগ করুন</button>
     `;
-    btn.onclick = () => openCourse(c.id);
+    btn.onclick = (ev) => {
+      if (ev.target.closest(".admin-plus-btn")) return; // নিচের বাটনে ট্যাপ হলে কোর্স ওপেন হবে না
+      openCourse(c.id);
+    };
     wrap.appendChild(btn);
   });
+  wrap.querySelectorAll(".admin-plus-btn").forEach((btn) => {
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      openCourseAdminResume(btn.dataset.course);
+    };
+  });
+}
+
+async function openCourseAdminResume(courseId) {
+  const res = await fetch(`/api/courses/${courseId}`);
+  const course = await res.json();
+  activeCourseAdminId = course.id;
+  coursePartsSoFar = course.parts.map((p) => p.title);
+  document.getElementById("course-admin-parts-title").textContent = course.title;
+  renderCoursePartsExisting();
+  const nextNum = coursePartsSoFar.length + 1;
+  document.getElementById("part-title").value = "পরীক্ষা-" + String(nextNum).padStart(2, "0");
+  document.getElementById("part-duration").value = "20";
+  document.getElementById("part-syllabus").value = "";
+  show("view-course-admin-parts");
 }
 
 // ---- Admin: create course ----
