@@ -10,6 +10,84 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
 
+// ---------- স্থায়ী ডাটাবেজ (Upstash Redis) ----------
+// Render-এর ফ্রি প্ল্যানে ফাইল স্টোরেজ স্থায়ী নয় — সার্ভার ঘুমিয়ে গিয়ে আবার জাগলে
+// data.json-এর যেকোনো পরিবর্তন হারিয়ে যায়। তাই আসল ডেটা একটা ফ্রি, স্থায়ী Redis
+// ডাটাবেজে (Upstash) রাখা হচ্ছে। এই দুটো এনভায়রনমেন্ট ভ্যারিয়েবল Render-এ সেট করতে হবে:
+//   UPSTASH_REDIS_REST_URL
+//   UPSTASH_REDIS_REST_TOKEN
+// সেট করা না থাকলে (যেমন লোকাল টেস্টের সময়), সার্ভার data.json ফাইল ব্যবহার করবে।
+
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const REDIS_KEY = 'examhub-data';
+const USE_REDIS = !!(UPSTASH_URL && UPSTASH_TOKEN);
+
+const SEED_DATA = {
+  exams: [
+    {
+      id: 'bcs-42-prelim',
+      title: '৪২তম বিসিএস প্রিলিমিনারি (ডেমো)',
+      category: 'বিসিএস',
+      grade: '',
+      durationMinutes: 10,
+      negativeMark: 0.25,
+      sections: [
+        { name: 'বাংলা', questions: [
+          { id: 'b1', text: "'সুন্দর' শব্দের বিপরীত শব্দ কোনটি?", options: ['কুৎসিত', 'সুশ্রী', 'মনোরম', 'চারু'], correctIndex: 0 },
+          { id: 'b2', text: "'যা বলা হয়নি' — এক কথায় প্রকাশ করুন।", options: ['অনুক্ত', 'অব্যক্ত', 'অকথিত', 'অনুচ্চারিত'], correctIndex: 0 },
+        ]},
+        { name: 'ইংরেজি', questions: [
+          { id: 'e1', text: "Choose the correct synonym of 'Ubiquitous'.", options: ['Rare', 'Omnipresent', 'Hidden', 'Ancient'], correctIndex: 1 },
+          { id: 'e2', text: 'Fill in the blank: He is senior __ me.', options: ['than', 'to', 'from', 'with'], correctIndex: 1 },
+        ]},
+        { name: 'গণিত', questions: [
+          { id: 'm1', text: 'একটি সংখ্যার ৩০% = ৯০ হলে সংখ্যাটি কত?', options: ['২৭০', '৩০০', '৩৩০', '৩৬০'], correctIndex: 1 },
+          { id: 'm2', text: 'x + 5 = 12 হলে x এর মান কত?', options: ['5', '6', '7', '8'], correctIndex: 2 },
+        ]},
+        { name: 'সাধারণ জ্ঞান', questions: [
+          { id: 'g1', text: 'বাংলাদেশের স্বাধীনতা যুদ্ধ শুরু হয় কোন সালে?', options: ['১৯৭০', '১৯৭১', '১৯৭২', '১৯৬৯'], correctIndex: 1 },
+          { id: 'g2', text: 'বাংলাদেশের সংবিধান কার্যকর হয় কবে?', options: ['১৬ ডিসেম্বর ১৯৭২', '৪ নভেম্বর ১৯৭২', '২৬ মার্চ ১৯৭১', '১৭ এপ্রিল ১৯৭১'], correctIndex: 1 },
+        ]},
+      ],
+    },
+  ],
+  submissions: [],
+  courses: [],
+};
+
+async function readData() {
+  if (USE_REDIS) {
+    const res = await fetch(`${UPSTASH_URL}/get/${REDIS_KEY}`, {
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+    });
+    const json = await res.json();
+    if (json.result) {
+      const data = JSON.parse(json.result);
+      if (!data.courses) data.courses = [];
+      return data;
+    }
+    // প্রথমবার — এখনও কিছু সেভ হয়নি, ডেমো ডেটা দিয়ে শুরু করা হচ্ছে
+    await writeData(SEED_DATA);
+    return JSON.parse(JSON.stringify(SEED_DATA));
+  }
+  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+  if (!data.courses) data.courses = [];
+  return data;
+}
+
+async function writeData(data) {
+  if (USE_REDIS) {
+    await fetch(`${UPSTASH_URL}/set/${REDIS_KEY}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+      body: JSON.stringify(data),
+    });
+    return;
+  }
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -17,14 +95,6 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
 };
 
-function readData() {
-  const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-  if (!data.courses) data.courses = [];
-  return data;
-}
-function writeData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
 function sendJSON(res, status, obj) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(obj));
@@ -43,8 +113,8 @@ function readBody(req) {
 
 // ---------- API হ্যান্ডলার ----------
 
-function listExams(req, res) {
-  const data = readData();
+async function listExams(req, res) {
+  const data = await readData();
   const exams = data.exams
     .filter((e) => !e.courseId)
     .map((e) => ({
@@ -58,8 +128,8 @@ function listExams(req, res) {
   sendJSON(res, 200, exams);
 }
 
-function getExam(req, res, examId) {
-  const data = readData();
+async function getExam(req, res, examId) {
+  const data = await readData();
   const exam = data.exams.find((e) => e.id === examId);
   if (!exam) return sendJSON(res, 404, { message: 'পরীক্ষা পাওয়া যায়নি' });
 
@@ -75,7 +145,7 @@ function getExam(req, res, examId) {
 }
 
 async function submitExam(req, res, examId) {
-  const data = readData();
+  const data = await readData();
   const exam = data.exams.find((e) => e.id === examId);
   if (!exam) return sendJSON(res, 404, { message: 'পরীক্ষা পাওয়া যায়নি' });
 
@@ -123,13 +193,13 @@ async function submitExam(req, res, examId) {
   };
 
   data.submissions.push(submission);
-  writeData(data);
+  await writeData(data);
 
   sendJSON(res, 200, { submission, questions: reviewedQuestions });
 }
 
-function getMerit(req, res, examId) {
-  const data = readData();
+async function getMerit(req, res, examId) {
+  const data = await readData();
   const list = data.submissions
     .filter((s) => s.examId === examId)
     .sort((a, b) => b.score - a.score)
@@ -139,8 +209,8 @@ function getMerit(req, res, examId) {
 
 // ---------- সিরিজ পরীক্ষা (কোর্স) ----------
 
-function listCourses(req, res) {
-  const data = readData();
+async function listCourses(req, res) {
+  const data = await readData();
   const courses = (data.courses || []).map((c) => ({
     id: c.id,
     title: c.title,
@@ -151,8 +221,8 @@ function listCourses(req, res) {
   sendJSON(res, 200, courses);
 }
 
-function getCourseDetail(req, res, courseId) {
-  const data = readData();
+async function getCourseDetail(req, res, courseId) {
+  const data = await readData();
   const course = (data.courses || []).find((c) => c.id === courseId);
   if (!course) return sendJSON(res, 404, { message: 'কোর্স পাওয়া যায়নি' });
 
@@ -195,10 +265,10 @@ async function createCourse(req, res) {
     partIds: [],
   };
 
-  const data = readData();
+  const data = await readData();
   if (!data.courses) data.courses = [];
   data.courses.unshift(course);
-  writeData(data);
+  await writeData(data);
 
   sendJSON(res, 200, { id: course.id });
 }
@@ -211,7 +281,7 @@ async function addCoursePart(req, res, courseId) {
   const title = (body.title || '').trim();
   if (!title) return sendJSON(res, 400, { message: 'পরীক্ষার নাম দিতে হবে' });
 
-  const data = readData();
+  const data = await readData();
   const course = (data.courses || []).find((c) => c.id === courseId);
   if (!course) return sendJSON(res, 404, { message: 'কোর্স পাওয়া যায়নি' });
 
@@ -228,13 +298,13 @@ async function addCoursePart(req, res, courseId) {
 
   data.exams.unshift(part);
   course.partIds.push(part.id);
-  writeData(data);
+  await writeData(data);
 
   sendJSON(res, 200, { id: part.id });
 }
 
-function getCourseProgress(req, res, courseId, name) {
-  const data = readData();
+async function getCourseProgress(req, res, courseId, name) {
+  const data = await readData();
   const course = (data.courses || []).find((c) => c.id === courseId);
   if (!course) return sendJSON(res, 404, { message: 'কোর্স পাওয়া যায়নি' });
 
@@ -273,9 +343,9 @@ async function createExam(req, res) {
     sections: DEFAULT_SECTION_NAMES.map((name) => ({ name, questions: [] })),
   };
 
-  const data = readData();
+  const data = await readData();
   data.exams.unshift(exam);
-  writeData(data);
+  await writeData(data);
 
   sendJSON(res, 200, { id: exam.id, title: exam.title, type: exam.type });
 }
@@ -289,7 +359,7 @@ async function bulkAddQuestions(req, res, examId) {
   const sectionName = body.sectionName;
   const questions = Array.isArray(body.questions) ? body.questions : [];
 
-  const data = readData();
+  const data = await readData();
   const exam = data.exams.find((e) => e.id === examId);
   if (!exam) return sendJSON(res, 404, { message: 'পরীক্ষা পাওয়া যায়নি' });
 
@@ -308,7 +378,7 @@ async function bulkAddQuestions(req, res, examId) {
     added.push(newQ);
   }
 
-  writeData(data);
+  await writeData(data);
   sendJSON(res, 200, { addedCount: added.length });
 }
 
@@ -338,32 +408,32 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
 
   try {
-    if (p === '/api/exams' && req.method === 'GET') return listExams(req, res);
+    if (p === '/api/exams' && req.method === 'GET') return await listExams(req, res);
     if (p === '/api/exams' && req.method === 'POST') return await createExam(req, res);
 
     let m = p.match(/^\/api\/exams\/([^/]+)$/);
-    if (m && req.method === 'GET') return getExam(req, res, m[1]);
+    if (m && req.method === 'GET') return await getExam(req, res, m[1]);
 
     m = p.match(/^\/api\/exams\/([^/]+)\/submit$/);
     if (m && req.method === 'POST') return await submitExam(req, res, m[1]);
 
     m = p.match(/^\/api\/exams\/([^/]+)\/merit$/);
-    if (m && req.method === 'GET') return getMerit(req, res, m[1]);
+    if (m && req.method === 'GET') return await getMerit(req, res, m[1]);
 
     m = p.match(/^\/api\/exams\/([^/]+)\/questions\/bulk$/);
     if (m && req.method === 'POST') return await bulkAddQuestions(req, res, m[1]);
 
-    if (p === '/api/courses' && req.method === 'GET') return listCourses(req, res);
+    if (p === '/api/courses' && req.method === 'GET') return await listCourses(req, res);
     if (p === '/api/courses' && req.method === 'POST') return await createCourse(req, res);
 
     m = p.match(/^\/api\/courses\/([^/]+)$/);
-    if (m && req.method === 'GET') return getCourseDetail(req, res, m[1]);
+    if (m && req.method === 'GET') return await getCourseDetail(req, res, m[1]);
 
     m = p.match(/^\/api\/courses\/([^/]+)\/parts$/);
     if (m && req.method === 'POST') return await addCoursePart(req, res, m[1]);
 
     m = p.match(/^\/api\/courses\/([^/]+)\/progress$/);
-    if (m && req.method === 'GET') return getCourseProgress(req, res, m[1], url.searchParams.get('name') || '');
+    if (m && req.method === 'GET') return await getCourseProgress(req, res, m[1], url.searchParams.get('name') || '');
 
     if (p.startsWith('/api/')) return sendJSON(res, 404, { message: 'রুট পাওয়া যায়নি' });
 
@@ -376,4 +446,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Exam Hub চালু হয়েছে → http://localhost:${PORT}`);
+  console.log(USE_REDIS ? 'স্টোরেজ: Upstash Redis (স্থায়ী)' : 'স্টোরেজ: লোকাল data.json ফাইল (অস্থায়ী)');
 });
