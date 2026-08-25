@@ -56,12 +56,26 @@ const SEED_DATA = {
   courses: [],
 };
 
+async function upstashCommand(commandArray) {
+  const res = await fetch(UPSTASH_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(commandArray),
+  });
+  const json = await res.json();
+  if (json.error) {
+    console.error('Upstash error:', json.error);
+    throw new Error('Upstash error: ' + json.error);
+  }
+  return json;
+}
+
 async function readData() {
   if (USE_REDIS) {
-    const res = await fetch(`${UPSTASH_URL}/get/${REDIS_KEY}`, {
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
-    });
-    const json = await res.json();
+    const json = await upstashCommand(['GET', REDIS_KEY]);
     if (json.result) {
       const data = JSON.parse(json.result);
       if (!data.courses) data.courses = [];
@@ -78,11 +92,7 @@ async function readData() {
 
 async function writeData(data) {
   if (USE_REDIS) {
-    await fetch(`${UPSTASH_URL}/set/${REDIS_KEY}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
-      body: JSON.stringify(data),
-    });
+    await upstashCommand(['SET', REDIS_KEY, JSON.stringify(data)]);
     return;
   }
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
